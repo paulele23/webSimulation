@@ -1,0 +1,181 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Phase 2</title>
+</head>
+<body>
+    <!-- Upload Section -->
+    <div id="configBefore">
+        <h1 id="main-title">WebGPU N-Body Simulation</h1>
+        <div id="upload-section">
+        <label for="csv-upload" id="upload-label">Upload simulation data:</label>
+        <input type="file" id="csv-upload" accept=".csv" />
+    </div>
+    </div>
+    <!-- Canvas Section -->
+    <div id="canvas-container"></div>
+    <div id="canvas-hint" style="display:none;">Click in the canvas to control the camera with WASD and Mouse. <br> Press ESC to exit again.</div>
+    <div id="config-menu" style="display:none;">
+        <h3>Simulation Config</h3>
+        <label for="config-computeSteps">Compute Steps per Frame:</label>
+        <input id="config-computeSteps" type="number" min="1" value="1">
+        <label for="config-dt">dt (days):</label>
+        <input type="number" id="config-dt" step="0.001" min="0.001" value="0.04"><br>
+        <label for="config-G">G (m³/kg/s²):</label>
+        <input type="number" id="config-G" step="1e-12" min="0" value="6.67430e-11"><br>
+        <label for="config-epsilon">epsilon:</label>
+        <input type="number" id="config-epsilon" step="1e-7" min="0" value="1e-6"><br>
+        <button id="config-apply">Apply</button>
+        <button id="config-toggle" style="margin-top:0.7rem;width:100%;padding:0.4rem 0;font-size:1rem;background:#198754;color:#fff;border:none;border-radius:0.3rem;cursor:pointer;transition:background 0.2s;">Stop Simulation</button>
+        <div id="sun-position-controls" style="margin-top:1.2rem;">
+            <label style="font-weight:bold;">Set Sun Position (in AU):</label>
+            <div style="display:flex;gap:0.3rem;margin-top:0.3rem;">
+                <input type="number" id="sun-x" step="0.01" value="0" style="width:30%;" placeholder="X">
+                <input type="number" id="sun-y" step="0.01" value="0" style="width:30%;" placeholder="Y">
+                <input type="number" id="sun-z" step="0.01" value="0" style="width:30%;" placeholder="Z">
+            </div>
+            <button id="set-sun-btn" style="margin-top:0.5rem;width:100%;padding:0.3rem 0;font-size:1rem;background:#f39c12;color:#fff;border:none;border-radius:0.3rem;cursor:pointer;transition:background 0.2s;">Move Sun</button>
+        </div>
+    </div>
+    <script type="module" src="./main.js"></script>
+</body>
+
+<style>
+    #upload-section {
+        position: fixed;
+        top: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 2000;
+        background: rgba(255,255,255,0.98);
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+        padding: 1.2rem 2rem 1.2rem 2rem;
+        min-width: 260px;
+        max-width: 400px;
+        width: 320px;
+        font-family: sans-serif;
+        font-size: 1.1rem;
+        color: #222;
+        text-align: center;
+        margin-bottom: 1.2rem;
+        box-sizing: border-box;
+    }
+    #main-title {
+        margin: 0 0 1.1rem 0;
+        font-size: 2rem;
+        font-weight: 700;
+        color: #222;
+        text-align: center;
+        letter-spacing: 0.02em;
+    }
+    #upload-label {
+        font-weight: bold;
+        margin-bottom: 0.7rem;
+        display: block;
+        font-size: 1.1rem;
+    }
+    #csv-upload {
+        margin-top: 0.5rem;
+        font-size: 1rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 0.3rem;
+        border: 1px solid #ccc;
+        background: #f8f9fa;
+        cursor: pointer;
+        width: 100%;
+    }
+    #canvas-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 100;
+    }
+    #canvas-hint {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1200;
+        background: rgba(255,255,255,0.97);
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        padding: 0.7rem 1.5rem 0.7rem 1.5rem;
+        min-width: 220px;
+        max-width: 320px;
+        width: 260px;
+        font-family: sans-serif;
+        font-size: 1.08rem;
+        color: #222;
+        text-align: center;
+        margin-bottom: 0.5rem;
+        word-break: break-word;
+        white-space: normal;
+        box-sizing: border-box;
+    }
+    #config-menu {
+        position: fixed;
+        top: 150px;
+        right: 20px;
+        z-index: 1100;
+        background: rgba(255,255,255,0.97);
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        padding: 1.2rem 1.5rem 1rem 1.5rem;
+        min-width: 220px;
+        max-width: 320px;
+        width: 260px;
+        font-family: sans-serif;
+        box-sizing: border-box;
+    }
+    #config-menu h3 {
+        margin-top: 0;
+        margin-bottom: 0.7rem;
+        font-size: 1.1rem;
+        color: #222;
+    }
+    #config-menu label {
+        display: block;
+        margin-top: 0.5rem;
+        font-size: 0.98rem;
+        color: #333;
+    }
+    #config-menu input[type=number] {
+        width: 100%;
+        margin-bottom: 0.2rem;
+        padding: 0.2rem 0.4rem;
+        font-size: 1rem;
+        border: 1px solid #ccc;
+        border-radius: 0.3rem;
+        box-sizing: border-box;
+    }
+    #config-apply {
+        margin-top: 0.7rem;
+        width: 100%;
+        padding: 0.4rem 0;
+        font-size: 1rem;
+        background: #0d6efd;
+        color: #fff;
+        border: none;
+        border-radius: 0.3rem;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    #config-apply:hover, #config-apply:focus {
+        background: #6610f2;
+        outline: none;
+    }
+</style>
+<script>
+const uploadSection = document.getElementById('upload-section');
+const mainTitle = document.getElementById('main-title');
+window.showSimulationUI = function() {
+    configMenu.style.display = '';
+    canvasHint.style.display = '';
+    uploadSection.style.display = 'none';
+    if (mainTitle) mainTitle.style.display = 'none';
+};
+</script>
+</html>
