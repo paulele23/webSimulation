@@ -47,8 +47,19 @@
 
 <body>
     <button id="enter-vr">Enter VR</button>
-    <canvas id="canvas" width="2560 " height="1440"></canvas>
-    <script type="module", src="./webgl.js"></script>
+    <canvas id="canvas" width="2560" height="1440"></canvas>
+    <script type="module">
+        import { WebGLSimulation } from './webgl.js';
+        const canvas = document.getElementById('canvas');
+        const enterVRButton = document.getElementById('enter-vr');
+        fetch('./data/input.csv')
+            .then(response => response.text())
+            .then(async csv => {
+                const sim = new WebGLSimulation(canvas, csv, enterVRButton);
+                await sim.initialize();
+                sim.start();
+            });
+    </script>
 </body>
 
 </html>
