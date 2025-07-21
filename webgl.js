@@ -52,12 +52,20 @@ let computeQuadVBO;
 let G;
 let dt = 0.04;
 let epsilonSq = 1e-6;
+let isSimulationRunning = false;
+let computeStepsPerFrame = 10;
 
 function changeGToInSI(gInSI) {
     const au = 1.49597870691e11;
     const day = 86400;
     const conversionFactor = Math.pow(au, -3) * Math.pow(day, 2);
     G = conversionFactor * gInSI;
+}
+function changeEpsilonTo(value){
+    epsilonSq = value * value;
+}
+function changeTimestepToInDays(value) {
+    dt = value;
 }
 
 changeGToInSI(6.67430e-11); // Gravitational constant in m^3 kg^-1 s^-2
@@ -219,7 +227,7 @@ function compileShader(type, source) {
     return shader;
 }
 
-function computeNSimulationSteps(N=100) {
+function computeNSimulationSteps(N=10) {
     for (let i = 0; i < N; i++) {
         runPiplineDefinedIn(
             computeVelProgram, //program
@@ -406,6 +414,7 @@ function frame() {
 
 requestAnimationFrame(frame);
 }
+
 
 await initialize();
 start()
