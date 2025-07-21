@@ -8,7 +8,6 @@ flat in float vClassId;
 uniform vec3 uLightPosition;
 uniform vec3 uLightColor;
 uniform vec3 uAmbientColor;
-uniform sampler2D uSimdTex;
 
 out vec4 outColor;
 

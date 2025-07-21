@@ -1,7 +1,7 @@
 import { createSphere } from "./utils/createSphere.js";
 import { mat4, vec3} from 'https://cdn.skypack.dev/gl-matrix';
 import { Controls } from "./utils/control.js";
-import { loadSimData } from "./utils/loadData.js"
+import { loadSimData, loadSimDataSplit } from "./utils/loadData.js"
 import { loadShader } from "./utils/loadShader.js";
 
 
@@ -37,8 +37,10 @@ var indexBuffer;
 var indices;
 var numberOfObjects;
 let ping = true;
-let simTextures; // Ping-pong state
-let simTexLoc;
+let simTexturePos;
+let simTextureVel; // Ping-pong state
+let simPosLoc;
+let simVelLoc;
 
 async function setup() {
     // Compile shaders
@@ -84,55 +86,56 @@ async function setup() {
     gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(aNormal, 0);
     
+    
+    function createSimDataTexture(data, length) {
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        // Assume 3 rows, 4 columns, 1 RGBA float per texel (12 floats per row)
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA32F,
+            1, // width
+            length, // height
+            0,
+            gl.RGBA,
+            gl.FLOAT,
+            data
+        );
+        return texture;
+        
+    }
+
     const csv = await (await fetch("./data/input.csv")).text();
-    const simData = await loadSimData(csv);
-    numberOfObjects = simData[1];
+    const simData = await loadSimDataSplit(csv);
+    const simDataPos = simData[0];
+    const simDataVel = simData[1];
+    numberOfObjects = simData[2];
     // Create two textures for ping-ponging
-    const simdTextureA = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, simdTextureA);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA32F,
-        3, // width
-        numberOfObjects, // height
-        0,
-        gl.RGBA,
-        gl.FLOAT,
-        simData[0]
-    );
+    const simTexturePosA = createSimDataTexture(simDataPos, numberOfObjects);
+    const simTexturePosB = createSimDataTexture(simDataPos, numberOfObjects);
+    simTexturePos = [simTexturePosA, simTexturePosB];
+    const simDataTextureVelA = createSimDataTexture(simDataVel, numberOfObjects);
+    const simDataTextureVelB = createSimDataTexture(simDataVel, numberOfObjects);
+    simTextureVel = [simDataTextureVelA, simDataTextureVelB];
+    
 
-    const simdTextureB = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, simdTextureB);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    // Assume 3 rows, 4 columns, 1 RGBA float per texel (12 floats per row)
-    gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA32F,
-        3, // width
-        numberOfObjects, // height
-        0,
-        gl.RGBA,
-        gl.FLOAT,
-        simData[0]
-    );
-
-    simTextures = [simdTextureA, simdTextureB]; // Store textures for ping-ponging
-
-    // Bind texture to vertex and fragment shader
-    simTexLoc = gl.getUniformLocation(program, 'uSimdTex');
+    // Bind textures to vertex and fragment shader
+    simPosLoc = gl.getUniformLocation(program, 'simTexturePos');
+    simVelLoc = gl.getUniformLocation(program, 'simTextureVel');
     gl.useProgram(program);
+    // Bind position texture to TEXTURE0
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, simTextures[ping ? 0 : 1]);
-    gl.uniform1i(simTexLoc, 0);
+    gl.bindTexture(gl.TEXTURE_2D, simTexturePos[ping ? 0 : 1]);
+    gl.uniform1i(simPosLoc, 0);
+    // Bind velocity texture to TEXTURE1
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, simTextureVel[ping ? 0 : 1]);
+    if (simVelLoc !== null) gl.uniform1i(simVelLoc, 1);
 
 
     mat4.perspective(projectionMatrix, Math.PI / 4, canvas.width / canvas.height, 0.1, 100.0);
@@ -162,9 +165,14 @@ let controls = new Controls(canvas, startingPosition, 0.0004, 20);
 
 
 function drawScene() {
+    // Bind position texture to TEXTURE0
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, simTextures[ping ? 0 : 1]);
-    gl.uniform1i(simTexLoc, 0);
+    gl.bindTexture(gl.TEXTURE_2D, simTexturePos[ping ? 0 : 1]);
+    gl.uniform1i(simPosLoc, 0);
+    // Bind velocity texture to TEXTURE1
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, simTextureVel[ping ? 0 : 1]);
+    gl.uniform1i(simVelLoc, 1);
     ping = !ping;
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
     gl.drawElementsInstanced(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0, numberOfObjects);

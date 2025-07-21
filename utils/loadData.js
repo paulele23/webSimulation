@@ -44,10 +44,10 @@ export async function loadSimDataSplit(csv){
         dataPos[base + 2] = +pos_z;
         dataPos[base + 3] = +mass; // padding
         // vel
-        dataVel[base + 4] = +vel_x;
-        dataVel[base + 5] = +vel_y;
-        dataVel[base + 6] = +vel_z;
-        dataVel[base + 7] = mapClassToInteger(cls);
+        dataVel[base + 0] = +vel_x;
+        dataVel[base + 1] = +vel_y;
+        dataVel[base + 2] = +vel_z;
+        dataVel[base + 3] = mapClassToInteger(cls);
     });
     return [dataPos, dataVel, dataObjects.length];
 }
