@@ -8,31 +8,28 @@ import { loadShader } from "./utils/loadShader.js";
 const canvas = document.getElementById('canvas');
 // Switch to WebGL2 context
 const gl = canvas.getContext('webgl2', { xrCompatible: true });
+gl.getExtension('EXT_color_buffer_float');
 
 if (!gl) {
     alert('WebGL2 not supported!');
 }
 
+const csv = await (await fetch("./data/input.csv")).text();
 const vertexShaderSource = await loadShader("./shader/webgl.vert");
 const fragmentShaderSource = await loadShader("./shader/webgl.frag");
-
-function compileShader(type, source) {
-    const shader = gl.createShader(type);
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('Shader compile failed:', gl.getShaderInfoLog(shader));
-        gl.deleteShader(shader);
-        return null;
-    }
-    return shader;
-}
+const computeVertexSource = await loadShader("./shader/webglCompute.vert");
+const computeVelFragmentSource = await loadShader("./shader/webglComputeVel.frag");
+const computePosFragmentSource = await loadShader("./shader/webglComputePos.frag");
 
 // Set up matrices
 const projectionMatrix = mat4.create();
 const modelViewMatrix = mat4.create();
 const normalMatrix = mat4.create();
 const program = gl.createProgram();
+var vertexBuffer;
+var normalBuffer;
+var aPosition;
+var aNormal;
 var indexBuffer;
 var indices;
 var numberOfObjects;
@@ -41,8 +38,29 @@ let simTexturePos;
 let simTextureVel; // Ping-pong state
 let simPosLoc;
 let simVelLoc;
+let xrSession;
 
-async function setup() {
+// --- Compute step resources ---
+let computeFramebuffer;
+let computeVelProgram;
+let computePosProgram;
+let computeQuadVBO;
+
+//simulation parameters
+let G;
+let dt = 0.04;
+let epsilonSq = 1e-6;
+
+function changeGToInSI(gInSI) {
+    const au = 1.49597870691e11;
+    const day = 86400;
+    const conversionFactor = Math.pow(au, -3) * Math.pow(day, 2);
+    G = conversionFactor * gInSI;
+}
+
+changeGToInSI(6.67430e-11); // Gravitational constant in m^3 kg^-1 s^-2
+
+async function initialize() {
     // Compile shaders
     const vertexShader = compileShader(gl.VERTEX_SHADER, vertexShaderSource);
     const fragmentShader = compileShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
@@ -54,17 +72,46 @@ async function setup() {
     gl.linkProgram(program);
     gl.useProgram(program);
 
+
+    const cVert = compileShader(gl.VERTEX_SHADER, computeVertexSource);
+    const cVelFrag = compileShader(gl.FRAGMENT_SHADER, computeVelFragmentSource);
+    const cPosFrag = compileShader(gl.FRAGMENT_SHADER, computePosFragmentSource);
+    
+    //create compute Pipline for vel update
+    computeVelProgram = gl.createProgram();
+    gl.attachShader(computeVelProgram, cVert);
+    gl.attachShader(computeVelProgram, cVelFrag);
+    gl.linkProgram(computeVelProgram);
+
+    //create compute Pipline for position update
+    computePosProgram = gl.createProgram();
+    gl.attachShader(computePosProgram, cVert);
+    gl.attachShader(computePosProgram, cPosFrag);
+    gl.linkProgram(computePosProgram);
+
+    // Fullscreen quad VBO
+    computeQuadVBO = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, computeQuadVBO);
+    // 2 triangles covering [-1,1]x[-1,1]
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1, -1, 1, -1, -1, 1,
+        -1, 1, 1, -1, 1, 1
+    ]), gl.STATIC_DRAW);
+
+    // Framebuffer for compute output
+    computeFramebuffer = gl.createFramebuffer();
+
     // Assume your data arrays are already defined
     const { positions, normals, ...x } = createSphere();
     indices = x.indices;
 
     // Create and bind vertex buffer
-    const vertexBuffer = gl.createBuffer();
+    vertexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
     // Create and bind normal buffer
-    const normalBuffer = gl.createBuffer();
+    normalBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
 
@@ -74,13 +121,13 @@ async function setup() {
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
     // Setup attributes
-    const aPosition = gl.getAttribLocation(program, 'aPosition');
+    aPosition = gl.getAttribLocation(program, 'aPosition');
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
     gl.enableVertexAttribArray(aPosition);
     gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(aPosition, 0);
 
-    const aNormal = gl.getAttribLocation(program, 'aNormal');
+    aNormal = gl.getAttribLocation(program, 'aNormal');
     gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
     gl.enableVertexAttribArray(aNormal);
     gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
@@ -110,7 +157,6 @@ async function setup() {
         
     }
 
-    const csv = await (await fetch("./data/input.csv")).text();
     const simData = await loadSimDataSplit(csv);
     const simDataPos = simData[0];
     const simDataVel = simData[1];
@@ -122,6 +168,7 @@ async function setup() {
     const simDataTextureVelA = createSimDataTexture(simDataVel, numberOfObjects);
     const simDataTextureVelB = createSimDataTexture(simDataVel, numberOfObjects);
     simTextureVel = [simDataTextureVelA, simDataTextureVelB];
+    // --- End compute setup ---
     
 
     // Bind textures to vertex and fragment shader
@@ -158,13 +205,85 @@ async function setup() {
     gl.enable(gl.DEPTH_TEST);
 }
 
-await setup();
-let startingPosition = [0, 0, 2];
-let controls = new Controls(canvas, startingPosition, 0.0004, 20);
+function compileShader(type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error('Shader compile failed:', gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+    }
+    return shader;
+}
 
+function computeNSimulationSteps(N=100) {
+    for (let i = 0; i < N; i++) {
+        runPiplineDefinedIn(
+            computeVelProgram, //program
+            simTexturePos[ping ? 0 : 1], simTextureVel[ping ? 0 : 1], //input textures
+            simTextureVel[!ping ? 0 : 1]); //output texture // Swap after compute
+        runPiplineDefinedIn(
+            computePosProgram,
+            simTexturePos[ping ? 0 : 1], simTextureVel[!ping ? 0 : 1],
+            simTexturePos[!ping ? 0 : 1]);
+        ping = !ping;
+    }
+    restoreRenderState();
+}
 
+function runPiplineDefinedIn(programToCompute, inputTexturePos, inputTextureVel, outputTexture) {
+    // Bind output texture to framebuffer
+    gl.bindFramebuffer(gl.FRAMEBUFFER, computeFramebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outputTexture, 0);
+    // Set viewport to texture size
+    gl.viewport(0, 0, 1, numberOfObjects);
+    gl.useProgram(programToCompute);
+    // Set uniforms
+    gl.uniform1f(gl.getUniformLocation(programToCompute, 'dt'), dt);
+    gl.uniform1f(gl.getUniformLocation(programToCompute, 'G'), G);
+    gl.uniform1f(gl.getUniformLocation(programToCompute, 'epsilonSq'), epsilonSq);
+    gl.uniform1i(gl.getUniformLocation(programToCompute, 'numberOfObjects'), numberOfObjects);
+    // Bind input textures
+    const locA = gl.getUniformLocation(programToCompute, 'uTexA');
+    const locB = gl.getUniformLocation(programToCompute, 'uTexB');
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, inputTexturePos);
+    gl.uniform1i(locA, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, inputTextureVel);
+    gl.uniform1i(locB, 1);
+    // Draw fullscreen quad
+    const quadLoc = gl.getAttribLocation(programToCompute, 'aQuadPos');
+    gl.bindBuffer(gl.ARRAY_BUFFER, computeQuadVBO);
+    gl.enableVertexAttribArray(quadLoc);
+    gl.vertexAttribPointer(quadLoc, 2, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.disableVertexAttribArray(quadLoc);
+}
 
-function drawScene() {
+function restoreRenderState() {
+    if (xrSession) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, xrSession.renderState.baseLayer.framebuffer);
+        const viewport = xrSession.renderState.baseLayer.getViewport(xrSession.renderState.baseLayer.views[0]);
+        gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+    } else {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+    }
+}
+
+function renderStep() {
+    gl.useProgram(program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+    gl.enableVertexAttribArray(aPosition);
+    gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+
+    // Restore normal buffer and attribute
+    gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+    gl.enableVertexAttribArray(aNormal);
+    gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+
     // Bind position texture to TEXTURE0
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, simTexturePos[ping ? 0 : 1]);
@@ -173,14 +292,21 @@ function drawScene() {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, simTextureVel[ping ? 0 : 1]);
     gl.uniform1i(simVelLoc, 1);
-    ping = !ping;
+    
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
     gl.drawElementsInstanced(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0, numberOfObjects);
 }
 
+function drawScene() {
+    computeNSimulationSteps();
+    renderStep();
+}
+
+function start() {
+    let startingPosition = [0, 0, 2];
+let controls = new Controls(canvas, startingPosition, 0.0004, 20);
 
 // --- WebXR VR support additions ---
-let xrSession = null;
 let xrRefSpace = null;
 let xrMoveSpeed = 0.2; // meters per frame for joystick movement
 let xrUserPosition = [0, 0, -5]; // x, y, z offset in reference space
@@ -283,3 +409,9 @@ function frame() {
 }
 
 requestAnimationFrame(frame);
+}
+
+await initialize();
+start()
+
+
