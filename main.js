@@ -1,4 +1,5 @@
 import { WebGPUImplementation } from "./webGPU.js";
+import { WebGLImplementation } from './webgl.js';
 
 // File upload and dynamic initialization
 const fileInput = document.getElementById("csv-upload");
@@ -6,6 +7,8 @@ const canvasContainer = document.getElementById("canvas-container");
 const configMenu = document.getElementById('config-menu');
 const canvasHint = document.getElementById('canvas-hint');
 const uploadSection = document.getElementById('upload-section');
+const enterVRButton = document.getElementById('enter-vr');
+
 
 // Hide config and hint by default
 configMenu.style.display = 'none';
@@ -18,7 +21,7 @@ window.showSimulationUI = function() {
     uploadSection.style.display = 'none';
 };
 
-let webgpu = null;
+let simulation = null;
 
 fileInput.addEventListener("change", async (event) => {
     const file = event.target.files[0];
@@ -32,12 +35,12 @@ fileInput.addEventListener("change", async (event) => {
         canvas.width = 2560;
         canvas.height = 1440;
         canvasContainer.appendChild(canvas);
-        webgpu = new WebGPUImplementation(canvas, csv);
-        await webgpu.initialize();
-        webgpu.isSimulationRunning = false;
-        webgpu.start();
+        simulation = new WebGLImplementation(canvas, csv, enterVRButton);
+        await simulation.initialize();
+        simulation.isSimulationRunning = false;
+        simulation.start();
         updateConfigToggleBtn();
-        if (window.showSimulationUI) window.showSimulationUI();
+        window.showSimulationUI();
         console.log("WebGPU initialized and started.");
     };
     reader.readAsText(file);
@@ -58,12 +61,12 @@ const sunZInput = document.getElementById("sun-z");
 const setSunBtn = document.getElementById("set-sun-btn");
 
 function updateConfigToggleBtn() {
-    configToggleBtn.textContent = webgpu.isSimulationRunning ? "Stop Simulation" : "Start Simulation";
-    configToggleBtn.style.background = webgpu.isSimulationRunning ?  "#dc3545" : "#198754";
+    configToggleBtn.textContent = simulation.isSimulationRunning ? "Stop Simulation" : "Start Simulation";
+    configToggleBtn.style.background = simulation.isSimulationRunning ?  "#dc3545" : "#198754";
 }
 
 configToggleBtn.addEventListener("click", () => {
-    webgpu.isSimulationRunning = !webgpu.isSimulationRunning;
+    simulation.isSimulationRunning = !simulation.isSimulationRunning;
     updateConfigToggleBtn();
 });
 
@@ -72,10 +75,10 @@ applyBtn.addEventListener("click", () => {
     const G = parseFloat(gInput.value);
     const epsilon = parseFloat(epsilonInput.value);
     const computeSteps = parseInt(computeStepsInput.value);
-    if (!isNaN(dt)) webgpu.changeTimestepToInDays(dt);
-    if (!isNaN(G)) webgpu.changeGToInSI(G);
-    if (!isNaN(epsilon)) webgpu.changeEpsilonTo(epsilon);
-    if (!isNaN(computeSteps)) webgpu.computeStepsPerFrame = computeSteps;
+    if (!isNaN(dt)) simulation.changeTimestepToInDays(dt);
+    if (!isNaN(G)) simulation.changeGToInSI(G);
+    if (!isNaN(epsilon)) simulation.changeEpsilonTo(epsilon);
+    if (!isNaN(computeSteps)) simulation.computeStepsPerFrame = computeSteps;
 });
 
 setSunBtn.addEventListener("click", () => {
@@ -83,6 +86,6 @@ setSunBtn.addEventListener("click", () => {
     const y = parseFloat(sunYInput.value);
     const z = parseFloat(sunZInput.value);
     if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
-        webgpu.setSunPosition(x, y, z);
+        simulation.setSunPosition(x, y, z);
     }
 });

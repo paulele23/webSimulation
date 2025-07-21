@@ -5,7 +5,7 @@ import { Controls } from "./utils/control.js";
 import { loadSimDataSplit } from "./utils/loadData.js";
 import { loadShader } from "./utils/loadShader.js";
 
-class WebGLSimulation {
+class WebGLImplementation {
     constructor(canvas, csv, enterVRButton) {
         this.canvas = canvas;
         this.csv = csv;
@@ -22,7 +22,7 @@ class WebGLSimulation {
         this.dt = 0.04;
         this.epsilonSq = 1e-6;
         this.isSimulationRunning = false;
-        this.computeStepsPerFrame = 10;
+        this.computeStepsPerFrame = 1;
         this.G = undefined;
         this.xrSession = null;
         this.xrRefSpace = null;
@@ -46,6 +46,24 @@ class WebGLSimulation {
     }
     changeTimestepToInDays(value) {
         this.dt = value;
+    }
+
+    setSunPosition(x, y, z) {
+        const gl = this.gl;
+        const activeIdx = this.ping ? 0 : 1;
+        gl.bindTexture(gl.TEXTURE_2D, this.simTexturePos[activeIdx]);
+        const sunData = new Float32Array([x, y, z, 1.988469999999999977e+30]);
+        gl.texSubImage2D(
+            gl.TEXTURE_2D,
+            0,
+            0, // xoffset
+            0, // yoffset
+            1, // width
+            1, // height
+            gl.RGBA,
+            gl.FLOAT,
+            sunData
+        );
     }
 
     compileShader(type, source) {
@@ -198,8 +216,8 @@ class WebGLSimulation {
         gl.enable(gl.DEPTH_TEST);
     }
 
-    computeNSimulationSteps(N = 10) {
-        for (let i = 0; i < N; i++) {
+    computeNSimulationSteps() {
+        for (let i = 0; i < this.computeStepsPerFrame*this.isSimulationRunning; i++) {
             this.runPiplineDefinedIn(
                 this.computeVelProgram,
                 this.simTexturePos[this.ping ? 0 : 1], this.simTextureVel[this.ping ? 0 : 1],
@@ -358,6 +376,6 @@ class WebGLSimulation {
     }
 }
 
-export { WebGLSimulation };
+export { WebGLImplementation };
 
 
