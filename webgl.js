@@ -33,6 +33,7 @@ class WebGLImplementation {
         this.projectionMatrix = mat4.create();
         this.modelViewMatrix = mat4.create();
         this.normalMatrix = mat4.create();
+        this.elementsPerRow = 1;
     }
 
     changeGToInSI(gInSI) {
@@ -80,6 +81,14 @@ class WebGLImplementation {
 
     createSimDataTexture(data, length) {
         const gl = this.gl;
+        const texWidth = this.elementsPerRow;
+        const texHeight = Math.ceil(length / texWidth);
+        const requiredLength = texWidth * texHeight * 4;
+        if (data.length < requiredLength) {
+            const padded = new Float32Array(requiredLength);
+            padded.set(data);
+            data = padded;
+        }
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -90,8 +99,8 @@ class WebGLImplementation {
             gl.TEXTURE_2D,
             0,
             gl.RGBA32F,
-            1,
-            length,
+            texWidth,
+            texHeight,
             0,
             gl.RGBA,
             gl.FLOAT,
@@ -126,12 +135,18 @@ class WebGLImplementation {
         gl.attachShader(this.computeVelProgram, cVert);
         gl.attachShader(this.computeVelProgram, cVelFrag);
         gl.linkProgram(this.computeVelProgram);
+        // Bind elementsPerRow uniform for velocity compute program
+        gl.useProgram(this.computeVelProgram);
 
         //create compute Pipline for position update
         this.computePosProgram = gl.createProgram();
         gl.attachShader(this.computePosProgram, cVert);
         gl.attachShader(this.computePosProgram, cPosFrag);
         gl.linkProgram(this.computePosProgram);
+        // Bind elementsPerRow uniform for position compute program
+        gl.useProgram(this.computePosProgram);
+        const elementsPerRowPosLoc = gl.getUniformLocation(this.computePosProgram, 'elementsPerRow');
+        if (elementsPerRowPosLoc !== null) gl.uniform1i(elementsPerRowPosLoc, this.elementsPerRow);
 
         // Fullscreen quad VBO
         this.computeQuadVBO = gl.createBuffer();
@@ -180,6 +195,7 @@ class WebGLImplementation {
         const simDataPos = simData[0];
         const simDataVel = simData[1];
         this.numberOfObjects = simData[2];
+        this.elementsPerRow = Math.ceil(Math.sqrt(this.numberOfObjects));
         // Create two textures for ping-ponging
         const simTexturePosA = this.createSimDataTexture(simDataPos, this.numberOfObjects);
         const simTexturePosB = this.createSimDataTexture(simDataPos, this.numberOfObjects);
@@ -237,8 +253,11 @@ class WebGLImplementation {
         const gl = this.gl;
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.computeFramebuffer);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outputTexture, 0);
-        gl.viewport(0, 0, 1, this.numberOfObjects);
+        const texWidth = this.elementsPerRow;
+        const texHeight = Math.ceil(this.numberOfObjects / this.elementsPerRow);
+        gl.viewport(0, 0, texWidth, texHeight);
         gl.useProgram(programToCompute);
+        gl.uniform1i(gl.getUniformLocation(programToCompute, 'elementsPerRow'), this.elementsPerRow);
         gl.uniform1f(gl.getUniformLocation(programToCompute, 'dt'), this.dt);
         gl.uniform1f(gl.getUniformLocation(programToCompute, 'G'), this.G);
         gl.uniform1f(gl.getUniformLocation(programToCompute, 'epsilonSq'), this.epsilonSq);
@@ -353,6 +372,7 @@ class WebGLImplementation {
         for (const view of pose.views) {
             const viewport = session.renderState.baseLayer.getViewport(view);
             this.gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+            this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'elementsPerRow'), this.elementsPerRow);
             this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'uProjectionMatrix'), false, view.projectionMatrix);
             this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'uModelViewMatrix'), false, view.transform.inverse.matrix);
             mat4.invert(this.normalMatrix, view.transform.inverse.matrix);
@@ -368,6 +388,7 @@ class WebGLImplementation {
         const modelViewMatrix = this.controls.getViewMatrix();
         mat4.invert(this.normalMatrix, modelViewMatrix);
         mat4.transpose(this.normalMatrix, this.normalMatrix);
+        this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'elementsPerRow'), this.elementsPerRow);
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'uModelViewMatrix'), false, modelViewMatrix);
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'uNormalMatrix'), false, this.normalMatrix);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
