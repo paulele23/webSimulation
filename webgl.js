@@ -265,14 +265,8 @@ function runPiplineDefinedIn(programToCompute, inputTexturePos, inputTextureVel,
 }
 
 function restoreRenderState() {
-    if (xrSession) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, xrSession.renderState.baseLayer.framebuffer);
-        const viewport = xrSession.renderState.baseLayer.getViewport(xrSession.renderState.baseLayer.views[0]);
-        gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
-    } else {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, canvas.width, canvas.height);
-    }
 }
 
 function renderStep() {
