@@ -7,12 +7,52 @@
 </head>
 
 <body>
-    <!-- Upload Section -->
+    <!-- Input Menu Section -->
     <div id="configBefore">
         <h1 id="main-title">WebGPU N-Body Simulation</h1>
-        <div id="upload-section">
-            <label for="csv-upload" id="upload-label">Upload simulation data:</label>
-            <input type="file" id="csv-upload" accept=".csv" />
+        <div id="input-menu">
+            <label id="top-label" style="font-weight:bold;">Mode:</label>
+            <div style="display:flex;flex-direction:row;gap:1.2rem;justify-content:center;margin-bottom:1.2rem;">
+                <div>
+                    <input type="radio" id="mode-visualize" name="mode-type" value="visualize" checked>
+                    <label for="mode-visualize">Visualize</label>
+                </div>
+                <div>
+                    <input type="radio" id="mode-benchmark" name="mode-type" value="benchmark">
+                    <label for="mode-benchmark">Benchmark</label>
+                </div>
+            </div>
+            <div id="visualize-options">
+                <label id="input-label" style="font-weight:bold;">Select Input Data:</label>
+                <div style="display:flex;flex-direction:column;gap:0.7rem;align-items:center;">
+                    <div style="width:100%;">
+                        <input type="radio" id="input-default" name="input-type" value="default" checked>
+                        <label for="input-default">Default File</label>
+                        <select id="default-file-select" style="margin-left:1rem;">
+                            <option value="./data/planets_and_moons.csv">Planets and Moons</option>
+                            <option value="./data/scenario2_n80000.csv">Scenario 2 (n=80000)</option>
+                            <option value="./data/scenario2_n240000.csv">Scenario 2 (n=240000)</option>
+                        </select>
+                    </div>
+                    <div style="width:100%;">
+                        <input type="radio" id="input-custom" name="input-type" value="custom">
+                        <label for="input-custom">Custom Upload</label>
+                        <input type="file" id="csv-upload" accept=".csv" style="margin-left:1rem;">
+                    </div>
+                </div>
+                <label id="impl-label" style="font-weight:bold;margin-top:1.2rem;display:block;">Select Implementation:</label>
+                <div style="display:flex;flex-direction:row;gap:1.2rem;justify-content:center;margin-top:0.5rem;">
+                    <div>
+                        <input type="radio" id="impl-webgpu" name="impl-type" value="webgpu" checked>
+                        <label for="impl-webgpu">WebGPU</label>
+                    </div>
+                    <div>
+                        <input type="radio" id="impl-webgl" name="impl-type" value="webgl">
+                        <label for="impl-webgl">WebGL</label>
+                    </div>
+                </div>
+            </div>
+            <button id="input-submit" style="margin-top:1.2rem;width:100%;padding:0.5rem 0;font-size:1.1rem;background:#0d6efd;color:#fff;border:none;border-radius:0.3rem;cursor:pointer;transition:background 0.2s;">Submit</button>
         </div>
     </div>
     <!-- Canvas Section -->
@@ -71,9 +111,9 @@
         outline: none;
     }
 
-    #upload-section {
+    #input-menu {
         position: fixed;
-        top: 30px;
+        top: 90px;
         left: 50%;
         transform: translateX(-50%);
         z-index: 2000;
@@ -83,17 +123,49 @@
         padding: 1.2rem 2rem 1.2rem 2rem;
         min-width: 260px;
         max-width: 400px;
-        width: 320px;
+        width: 340px;
         font-family: sans-serif;
         font-size: 1.1rem;
         color: #222;
-        text-align: center;
+        text-align: left;
         margin-bottom: 1.2rem;
         box-sizing: border-box;
     }
+    #input-menu label {
+        font-size: 1.08rem;
+        margin-bottom: 0.3rem;
+    }
+    #input-menu input[type="file"] {
+        font-size: 1rem;
+        padding: 0.3rem 1.2rem;
+        border-radius: 0.3rem;
+        border: 1px solid #ccc;
+        background: #f8f9fa;
+        cursor: pointer;
+        width: 90%;
+        min-width: 220px;
+        max-width: 340px;
+        margin-top: 0.2rem;
+        box-sizing: border-box;
+    }
+    #input-menu select {
+        font-size: 1rem;
+        padding: 0.3rem 1.2rem;
+        border-radius: 0.3rem;
+        border: 1px solid #ccc;
+        background: #f8f9fa;
+        cursor: pointer;
+        width: 90%;
+        min-width: 220px;
+        max-width: 340px;
+        box-sizing: border-box;
+    }
+    #input-menu input[type="radio"] {
+        margin-right: 0.3rem;
+    }
 
     #main-title {
-        margin: 0 0 1.1rem 0;
+        margin: 30px 0 1.1rem 0;
         font-size: 2rem;
         font-weight: 700;
         color: #222;
@@ -209,15 +281,5 @@
         outline: none;
     }
 </style>
-<script>
-    const uploadSection = document.getElementById('upload-section');
-    const mainTitle = document.getElementById('main-title');
-    window.showSimulationUI = function () {
-        configMenu.style.display = '';
-        canvasHint.style.display = '';
-        uploadSection.style.display = 'none';
-        if (mainTitle) mainTitle.style.display = 'none';
-    };
-</script>
 
 </html>

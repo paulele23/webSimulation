@@ -1,25 +1,58 @@
+
 import { WebGPUImplementation } from "./webGPU.js";
 import { WebGLImplementation } from './webgl.js';
-
-// File upload and dynamic initialization
-const fileInput = document.getElementById("csv-upload");
-const canvasContainer = document.getElementById("canvas-container");
+const inputMenu = document.getElementById('input-menu');
+const mainTitle = document.getElementById('main-title');
 const configMenu = document.getElementById('config-menu');
 const canvasHint = document.getElementById('canvas-hint');
+const fileInput = document.getElementById("csv-upload");
+const canvasContainer = document.getElementById("canvas-container");
 const uploadSection = document.getElementById('upload-section');
 const enterVRButton = document.getElementById('enter-vr');
+const visualizeOptions = document.getElementById('visualize-options');
+let csv;
 
 
-// Hide config and hint by default
-configMenu.style.display = 'none';
-canvasHint.style.display = 'none';
 
-// Expose a function for main.js to show config/hint and hide upload
-window.showSimulationUI = function() {
-    configMenu.style.display = '';
-    canvasHint.style.display = '';
-    uploadSection.style.display = 'none';
-};
+// Function to get selected parameters and handle submit
+async function handleInputSubmit() {
+    // Get input
+    const mode = document.querySelector('input[name="mode-type"]:checked').value;
+    if (mode === 'benchmark') {benchmark(); return;}
+
+    const inputType = document.querySelector('input[name="input-type"]:checked').value;
+    if (inputType === 'default') {
+        csv = await (await fetch(document.getElementById('default-file-select').value)).text();
+    } //else already set one the file was uploaded;
+    const implType = document.querySelector('input[name="impl-type"]:checked').value;
+    canvasContainer.innerHTML = "";
+    const canvas = document.createElement("canvas");
+    canvas.width = 2560;
+    canvas.height = 1440;
+    canvasContainer.appendChild(canvas);
+    if (implType === 'webgpu') {
+        simulation = new WebGPUImplementation(canvas, csv);
+    } else if (implType === 'webgl') {
+        simulation = new WebGLImplementation(canvas, csv, enterVRButton);
+        enterVRButton.style.display = '';
+    } else {
+        console.error("Unknown implementation type selected:", implType);
+        return;
+    }
+    await simulation.initialize();
+    simulation.isSimulationRunning = false;
+    simulation.start();
+    updateConfigToggleBtn();
+    window.showSimulationUI();
+}
+
+document.getElementById('input-submit').addEventListener('click', handleInputSubmit);
+
+
+
+
+
+
 
 let simulation = null;
 
@@ -28,23 +61,21 @@ fileInput.addEventListener("change", async (event) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async (e) => {
-        const csv = e.target.result;
-        // Remove previous canvas if exists
-        canvasContainer.innerHTML = "";
-        const canvas = document.createElement("canvas");
-        canvas.width = 2560;
-        canvas.height = 1440;
-        canvasContainer.appendChild(canvas);
-        simulation = new WebGLImplementation(canvas, csv, enterVRButton);
-        await simulation.initialize();
-        simulation.isSimulationRunning = false;
-        simulation.start();
-        updateConfigToggleBtn();
-        window.showSimulationUI();
-        console.log("WebGPU initialized and started.");
+        csv = e.target.result;
     };
     reader.readAsText(file);
 });
+
+// Hide/show visualize options based on mode selection
+
+document.getElementById('mode-visualize').addEventListener('change', () => {
+    visualizeOptions.style.display = '';
+});
+document.getElementById('mode-benchmark').addEventListener('change', () => {
+    visualizeOptions.style.display = 'none';
+});
+
+
 
 //benchmark
 
@@ -59,6 +90,13 @@ const sunXInput = document.getElementById("sun-x");
 const sunYInput = document.getElementById("sun-y");
 const sunZInput = document.getElementById("sun-z");
 const setSunBtn = document.getElementById("set-sun-btn");
+
+window.showSimulationUI = function () {
+    configMenu.style.display = '';
+    canvasHint.style.display = '';
+    inputMenu.style.display = 'none';
+    if (mainTitle) mainTitle.style.display = 'none';
+};
 
 function updateConfigToggleBtn() {
     configToggleBtn.textContent = simulation.isSimulationRunning ? "Stop Simulation" : "Start Simulation";
@@ -89,3 +127,8 @@ setSunBtn.addEventListener("click", () => {
         simulation.setSunPosition(x, y, z);
     }
 });
+
+
+function benchmark(){
+    console.log("Benchmark function called");
+}
