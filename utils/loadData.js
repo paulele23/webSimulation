@@ -1,29 +1,60 @@
-export function u32ToF32Bits(u32) {
-  const buffer = new ArrayBuffer(4);
-  new Uint32Array(buffer)[0] = u32;
-  return new Float32Array(buffer)[0];
-}
-
-function mapClassToInteger(className){
-    switch (className) {
-        case "STA":
-            return 0;
-        case "PLA":
-            return 1;
-        case "DWA":
-            return 2;
-        case "SAT":
-            return 3;
-        default:
-            return 3;
-    }
-}
-
-
 export async function loadSimData(csv){
-    
-    const lines = csv.split(/\r?\n/).filter(Boolean);
+    const dataObjects = splitCSV(csv);
+    const floatsPerObj = 8; 
+    const data = new Float32Array(dataObjects.length * floatsPerObj);
+    dataObjects.forEach((object, i) => {
+        const [
+            name,            // 0
+            cls,              // 1
+            mass,             // 2
+            pos_x, pos_y, pos_z,         // 3–5
+            vel_x, vel_y, vel_z          // 6–8
+        ] = object;
+        const base = i * floatsPerObj;
+        data[base + 0] = +pos_x;
+        data[base + 1] = +pos_y;
+        data[base + 2] = +pos_z;
+        data[base + 3] = +mass;
+        // vel
+        data[base + 4] = +vel_x;
+        data[base + 5] = +vel_y;
+        data[base + 6] = +vel_z;
+        //mass
+        data[base + 7] = mapClassToInteger(cls); 
+    });
+    return [data, dataObjects.length];
+}
 
+export async function loadSimDataSplit(csv){  
+    const dataObjects = splitCSV(csv);
+    const dataPos = new Float32Array(dataObjects.length * 4);
+    const dataVel = new Float32Array(dataObjects.length * 4);
+    const floatsPerObj = 4;
+    dataObjects.forEach((object, i) => {
+        const [
+            name,            // 0
+            cls,              // 1
+            mass,             // 2
+            pos_x, pos_y, pos_z,         // 3–5
+            vel_x, vel_y, vel_z          // 6–8
+        ] = object;
+        const base = i * floatsPerObj;
+        dataPos[base + 0] = +pos_x;
+        dataPos[base + 1] = +pos_y;
+        dataPos[base + 2] = +pos_z;
+        dataPos[base + 3] = +mass; // padding
+        // vel
+        dataVel[base + 4] = +vel_x;
+        dataVel[base + 5] = +vel_y;
+        dataVel[base + 6] = +vel_z;
+        dataVel[base + 7] = mapClassToInteger(cls);
+    });
+    return [dataPos, dataVel, dataObjects.length];
+}
+
+
+function splitCSV(csv) {
+    const lines = csv.split(/\r?\n/).filter(Boolean);
     switch (lines[0]) {
         case "id,name,class,mass,pos_x,pos_y,pos_z,vel_x,vel_y,vel_z":
             return parseStateVector(lines);
@@ -32,49 +63,19 @@ export async function loadSimData(csv){
         default:
             throw new Error("Input not in the right format");
     }
-    
 }
+
 
 function parseStateVector(lines){
     const rows = lines.slice(1).map((l) => l.split(","));
-    const floatsPerObj = 12;             // 64 bytes / 4
-    const data = new Float32Array(rows.length * floatsPerObj);
-    rows.forEach((object, i) => {
-        const [
-            id,               // 0
-            name,
-            cls,              // 2
-            mass,             // 3
-            pos_x, pos_y, pos_z,         // 4–6
-            vel_x, vel_y, vel_z          // 7–9
-        ] = object;
-        const base = i * floatsPerObj;
-        data[base + 0] = +pos_x;
-        data[base + 1] = +pos_y;
-        data[base + 2] = +pos_z;
-        data[base + 3] = 0;
-        // vel
-        data[base + 4] = +vel_x;
-        data[base + 5] = +vel_y;
-        data[base + 6] = +vel_z;
-        //mass
-        data[base + 7] = +mass;
-        // acc
-        data[base + 8] = 0;
-        data[base + 9] = 0;
-        data[base + 10] = 0;
-
-        // class ID
-        data[base + 11] = mapClassToInteger(cls);    
-    });
-    return [data, rows.length]
+    rows.forEach((row) => row.shift());
+    return rows;
 }
 
 
 function parseKepler(lines){
     const rows = lines.slice(1).map((l) => l.split(","));
-    const floatsPerObj = 12;             // 64 bytes / 4
-    let result = [["Sun","STA",1.988469999999999977e+30,0,0,0,0,0,0]];
+    let result = [["Sun", "STA",1.988469999999999977e+30,0,0,0,0,0,0]]; // Central body (Sun)
     let mapNameToIndex = new Map();
     mapNameToIndex.set("Sun", 0);
     mapNameToIndex.set("", 0);
@@ -100,35 +101,7 @@ function parseKepler(lines){
         }
     }
 
-    const data = new Float32Array(rows.length * floatsPerObj);
-    result.forEach((object, i) => {
-        const [
-            name,
-            cls,              // 1
-            mass,             // 2
-            pos_x, pos_y, pos_z,         // 3–5
-            vel_x, vel_y, vel_z          // 6–8
-        ] = object;
-        const base = i * floatsPerObj;
-        data[base + 0] = +pos_x;
-        data[base + 1] = +pos_y;
-        data[base + 2] = +pos_z;
-        data[base + 3] = 0; // padding
-        // vel
-        data[base + 4] = +vel_x;
-        data[base + 5] = +vel_y;
-        data[base + 6] = +vel_z;
-        //mass
-        data[base + 7] = +mass;
-        // acc
-        data[base + 8] = 0;
-        data[base + 9] = 0;
-        data[base + 10] = 0;
-
-        // class ID
-        data[base + 11] = mapClassToInteger(cls);    
-    });
-    return [data, result.length];
+    return result;
 }
 
 const { sqrt, sin, cos } = Math;
@@ -242,4 +215,25 @@ function approximateAlbedo(type) {
     if (!range) return null; // or a default value
     const [min, max] = range[0] < range[1] ? range : [range[1], range[0]];
     return min + Math.random() * (max - min);
+}
+
+export function u32ToF32Bits(u32) {
+  const buffer = new ArrayBuffer(4);
+  new Uint32Array(buffer)[0] = u32;
+  return new Float32Array(buffer)[0];
+}
+
+function mapClassToInteger(className){
+    switch (className) {
+        case "STA":
+            return 0;
+        case "PLA":
+            return 1;
+        case "DWA":
+            return 2;
+        case "SAT":
+            return 3;
+        default:
+            return 3;
+    }
 }

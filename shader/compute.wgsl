@@ -2,9 +2,8 @@ override WORKGROUP_SIZE: u32 = 64;
 
 struct Object {
     pos: vec3<f32>,
-    vel: vec3<f32>,
     mass: f32,
-    acc: vec3<f32>,
+    vel: vec3<f32>,
     classID: f32,
 };
 
@@ -44,7 +43,6 @@ fn computeAcc(i: u32) -> vec3<f32> {
 @compute @workgroup_size(WORKGROUP_SIZE)
 fn computeMain(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let i = global_id.x;
-    objectsOut[i].acc = computeAcc(i);
-    objectsOut[i].vel = objectsIn[i].vel + objectsOut[i].acc * constant.dt;
+    objectsOut[i].vel = objectsIn[i].vel + computeAcc(i) * constant.dt;
     objectsOut[i].pos = objectsIn[i].pos + objectsOut[i].vel * constant.dt;
 }

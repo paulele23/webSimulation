@@ -5,9 +5,8 @@ lightDirection: vec3<f32>
 
 struct Object {
     pos: vec3<f32>,
-    vel: vec3<f32>,
     mass: f32,
-    acc: vec3<f32>,
+    vel: vec3<f32>,
     classID: f32,
 };
 

@@ -86,5 +86,3 @@ setSunBtn.addEventListener("click", () => {
         webgpu.setSunPosition(x, y, z);
     }
 });
-
-updateConfigToggleBtn();
