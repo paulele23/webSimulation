@@ -8,10 +8,12 @@ import { loadShader } from "./utils/loadShader.js";
 const canvas = document.getElementById('canvas');
 // Switch to WebGL2 context
 const gl = canvas.getContext('webgl2', { xrCompatible: true });
-gl.getExtension('EXT_color_buffer_float');
-
 if (!gl) {
     alert('WebGL2 not supported!');
+}
+const ext = gl.getExtension('EXT_color_buffer_float');
+if (!ext) {
+    alert('Extension not supported!');
 }
 
 const csv = await (await fetch("./data/input.csv")).text();
