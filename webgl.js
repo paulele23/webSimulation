@@ -395,6 +395,17 @@ class WebGLImplementation {
         this.drawScene();
         requestAnimationFrame(this.frame.bind(this));
     }
+
+
+    async benchmark() {
+        const start = performance.now();
+        const N = 1000;
+        for (let i = 0; i < N; i++) {
+            this.computeNSimulationSteps();
+        }
+        const end = performance.now();
+        return (end - start)/N;
+    }
 }
 
 export { WebGLImplementation };

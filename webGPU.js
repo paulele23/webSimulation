@@ -5,10 +5,10 @@ import { Controls } from "./utils/control.js";
 import { loadSimData, u32ToF32Bits } from "./utils/loadData.js"
 
 export class WebGPUImplementation {
-    constructor(canvas, csv) {
+    constructor(canvas, csv, device = null) {
         this.canvas = canvas;
         this.csv = csv
-        this.device = null;
+        this.device = device;
         this.context = null;
         this.canvasFormat = null;
         this.WORKGROUP_SIZE = 64;
@@ -31,15 +31,17 @@ export class WebGPUImplementation {
     }
 
     async initialize() {
-        if (!navigator.gpu) {
-            alert("WebGPU not supported on this browser.");
-            throw new Error("WebGPU not supported on this browser.");
+        if (!this.device) {
+            if (!navigator.gpu) {
+                alert("WebGPU not supported on this browser.");
+                throw new Error("WebGPU not supported on this browser.");
+            }
+            const adapter = await navigator.gpu.requestAdapter();
+            if (!adapter) {
+                throw new Error("No appropriate GPUAdapter found.");
+            }
+            this.device = await adapter.requestDevice();
         }
-        const adapter = await navigator.gpu.requestAdapter();
-        if (!adapter) {
-            throw new Error("No appropriate GPUAdapter found.");
-        }
-        this.device = await adapter.requestDevice();
         this.context = this.canvas.getContext("webgpu");
         this.canvasFormat = navigator.gpu.getPreferredCanvasFormat();
         this.context.configure({
@@ -321,5 +323,24 @@ export class WebGPUImplementation {
         }
         computePass.end();
         this.device.queue.submit([encoder.finish()]);
+    }
+
+    async benchmark() {
+        const N = 100;
+        const encoder = this.device.createCommandEncoder();
+        const start = performance.now();
+        const workgroupCount = Math.ceil(this.numberOfObjects / this.WORKGROUP_SIZE);
+        const computePass = encoder.beginComputePass();
+        computePass.setPipeline(this.simulationPipeline);
+        for (let i = 0; i < N; ++i) {
+            computePass.setBindGroup(0, this.bindGroups[this.pingPongCounter]);
+            computePass.dispatchWorkgroups(workgroupCount);
+            this.pingPongCounter = (this.pingPongCounter + 1) % 2;
+        }
+        computePass.end();
+        this.device.queue.submit([encoder.finish()]);
+        await this.device.queue.onSubmittedWorkDone();
+        const end = performance.now();
+        return (end - start)/ N;
     }
 }
