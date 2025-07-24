@@ -5,7 +5,7 @@ in vec3 vNormal;
 in vec3 vPosition;
 flat in float vClassId;
 
-uniform int elementsPerRow;
+//uniform int elementsPerRow;
 uniform vec3 uLightPosition;
 uniform vec3 uLightColor;
 uniform vec3 uAmbientColor;

@@ -132,8 +132,8 @@ async function benchmark() {
         { name: "WebGL", Impl: WebGLImplementation }
     ];
     const defaultFiles = [
+        { name: "80000", path: "data/scenario2_n240000.csv" },
         { name: "180", path: "data/planets_and_moons.csv" },
-        { name: "80000", path: "data/scenario2_n80000.csv" },
         { name: "240000", path: "data/scenario2_n240000.csv" }
     ];
 

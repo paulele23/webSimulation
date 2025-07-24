@@ -257,25 +257,35 @@ class WebGLImplementation {
         const texHeight = Math.ceil(this.numberOfObjects / this.elementsPerRow);
         gl.viewport(0, 0, texWidth, texHeight);
         gl.useProgram(programToCompute);
-        gl.uniform1i(gl.getUniformLocation(programToCompute, 'elementsPerRow'), this.elementsPerRow);
-        gl.uniform1f(gl.getUniformLocation(programToCompute, 'dt'), this.dt);
-        gl.uniform1f(gl.getUniformLocation(programToCompute, 'G'), this.G);
-        gl.uniform1f(gl.getUniformLocation(programToCompute, 'epsilonSq'), this.epsilonSq);
-        gl.uniform1i(gl.getUniformLocation(programToCompute, 'numberOfObjects'), this.numberOfObjects);
+        // Only set uniform if it exists in the shader
+        const elementsPerRowLoc = gl.getUniformLocation(programToCompute, 'elementsPerRow');
+        if (elementsPerRowLoc !== null && elementsPerRowLoc !== -1) {
+            gl.uniform1i(elementsPerRowLoc, this.elementsPerRow);
+        }
+        const dtLoc = gl.getUniformLocation(programToCompute, 'dt');
+        if (dtLoc !== null && dtLoc !== -1) gl.uniform1f(dtLoc, this.dt);
+        const gLoc = gl.getUniformLocation(programToCompute, 'G');
+        if (gLoc !== null && gLoc !== -1) gl.uniform1f(gLoc, this.G);
+        const epsLoc = gl.getUniformLocation(programToCompute, 'epsilonSq');
+        if (epsLoc !== null && epsLoc !== -1) gl.uniform1f(epsLoc, this.epsilonSq);
+        const nObjLoc = gl.getUniformLocation(programToCompute, 'numberOfObjects');
+        if (nObjLoc !== null && nObjLoc !== -1) gl.uniform1i(nObjLoc, this.numberOfObjects);
         const locA = gl.getUniformLocation(programToCompute, 'uTexA');
         const locB = gl.getUniformLocation(programToCompute, 'uTexB');
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, inputTexturePos);
-        gl.uniform1i(locA, 0);
+        if (locA !== null && locA !== -1) gl.uniform1i(locA, 0);
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, inputTextureVel);
-        gl.uniform1i(locB, 1);
+        if (locB !== null && locB !== -1) gl.uniform1i(locB, 1);
         const quadLoc = gl.getAttribLocation(programToCompute, 'aQuadPos');
         gl.bindBuffer(gl.ARRAY_BUFFER, this.computeQuadVBO);
-        gl.enableVertexAttribArray(quadLoc);
-        gl.vertexAttribPointer(quadLoc, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-        gl.disableVertexAttribArray(quadLoc);
+        if (quadLoc !== -1) {
+            gl.enableVertexAttribArray(quadLoc);
+            gl.vertexAttribPointer(quadLoc, 2, gl.FLOAT, false, 0, 0);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            gl.disableVertexAttribArray(quadLoc);
+        }
     }
 
     restoreRenderState() {

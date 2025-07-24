@@ -258,7 +258,10 @@ export class WebGPUImplementation {
     }
 
     start() {
+        this.last_time = 0;
         const frame = (time) => {
+            console.log("Frame time:", time - this.last_time);
+            this.last_time = time;
             const aspect = this.canvas.width / this.canvas.height;
             const farClipping = 1000;
             const nearClipping = 0.01;
@@ -326,7 +329,7 @@ export class WebGPUImplementation {
     }
 
     async benchmark() {
-        const N = 100;
+        const N = 1000;
         const encoder = this.device.createCommandEncoder();
         const start = performance.now();
         const workgroupCount = Math.ceil(this.numberOfObjects / this.WORKGROUP_SIZE);
@@ -341,6 +344,7 @@ export class WebGPUImplementation {
         this.device.queue.submit([encoder.finish()]);
         await this.device.queue.onSubmittedWorkDone();
         const end = performance.now();
+        console.log(`Benchmark completed in ${end - start} ms for ${N} compute steps.`);
         return (end - start)/ N;
     }
 }
