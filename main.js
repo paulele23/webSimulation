@@ -163,7 +163,6 @@ async function benchmark() {
                 file: file.name,
                 result: result
             });
-            canvasContainer.removeChild(canvas);
         }
     }
 

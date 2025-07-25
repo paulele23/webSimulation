@@ -344,7 +344,7 @@ export class WebGPUImplementation {
         this.device.queue.submit([encoder.finish()]);
         await this.device.queue.onSubmittedWorkDone();
         const end = performance.now();
-        console.log(`Benchmark completed in ${end - start} ms for ${N} compute steps.`);
+        console.log(`Benchmark completed in ${end - start} ns for ${N} compute steps.`);
         return (end - start)/ N;
     }
 }

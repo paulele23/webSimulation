@@ -379,6 +379,7 @@ class WebGLImplementation {
         }
         this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, session.renderState.baseLayer.framebuffer);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+        this.computeNSimulationSteps();
         for (const view of pose.views) {
             const viewport = session.renderState.baseLayer.getViewport(view);
             this.gl.viewport(viewport.x, viewport.y, viewport.width, viewport.height);
@@ -388,7 +389,7 @@ class WebGLImplementation {
             mat4.invert(this.normalMatrix, view.transform.inverse.matrix);
             mat4.transpose(this.normalMatrix, this.normalMatrix);
             this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'uNormalMatrix'), false, this.normalMatrix);
-            this.drawScene();
+            this.renderStep();
         }
         session.requestAnimationFrame(this.onXRFrame.bind(this));
     }
@@ -413,8 +414,10 @@ class WebGLImplementation {
         for (let i = 0; i < N; i++) {
             this.computeNSimulationSteps();
         }
+        const pixels = new Uint8Array(4*this.canvas.width*this.canvas.height);
+        this.gl.readPixels(0, 0, this.canvas.width, this.canvas.height, this.gl.RGBA, this.gl.UNSIGNED_BYTE, pixels);
         const end = performance.now();
-        return (end - start)/N;
+        return (end - start);
     }
 }
 
